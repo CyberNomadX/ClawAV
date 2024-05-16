@@ -40,7 +40,7 @@ local_virus_db = {
 def load_cache():
     if os.path.exists(CACHE_FILE):
         try:
-            with open(CACHE_FILE, 'r') as f:
+            with open(CACHE_FILE, 'r') as f):
                 return json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
             return {}
@@ -48,7 +48,7 @@ def load_cache():
 
 # Save cache to file
 def save_cache(cache):
-    with open(CACHE_FILE, 'w') as f:
+    with open(CACHE_FILE, 'w') as f):
         json.dump(cache, f)
 
 # Calculate MD5 hash of a file
@@ -61,10 +61,18 @@ def calculate_md5(file_path):
 
 # Check file with Hybrid Analysis and return the result
 def check_hybrid_analysis(file_hash):
-    headers = {'api-key': HYBRID_ANALYSIS_API_KEY, 'User-Agent': 'Falcon Sandbox'}
+    headers = {
+        'api-key': HYBRID_ANALYSIS_API_KEY,
+        'User-Agent': 'Falcon Sandbox',
+        'accept': 'application/json'
+    }
+    url = f'{HYBRID_ANALYSIS_BASE_URL}search/hash'
+    params = {'hash': file_hash}
+    print(f"Sending request to Hybrid Analysis: {url} with params: {params}")
     try:
-        response = requests.get(f'{HYBRID_ANALYSIS_BASE_URL}search/hash', headers=headers, params={'hash': file_hash})
+        response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
+        print(f"Hybrid Analysis response status code: {response.status_code}")
         if response.status_code == 200:
             return response.json()
     except requests.exceptions.RequestException as e:
@@ -141,10 +149,12 @@ def scan_file(file_path, cache):
         else:
             print(f"No threats detected by Hybrid Analysis with verdict {hybrid_analysis_result.get('verdict', 'unknown')}.")
     else:
-        print("No response from Hybrid Analysis or error occurred. Checking VirusTotal as fallback.")
-        if file_hash == "44d88612fea8a8f36de82e1278abb02f":  # Check VirusTotal for EICAR
-            print(f"File {file_path} is the EICAR test file. Submitting to VirusTotal for verification.")
-            return check_virustotal(file_hash, file_path, cache)
+        print("No response from Hybrid Analysis or error occurred.")
+
+    # Always check VirusTotal for EICAR test file
+    if file_hash == "44d88612fea8a8f36de82e1278abb02f":
+        print(f"File {file_path} is the EICAR test file. Submitting to VirusTotal for verification.")
+        return check_virustotal(file_hash, file_path, cache)
 
     return "No threats detected by Hybrid Analysis."
 
