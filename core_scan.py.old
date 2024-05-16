@@ -4,6 +4,7 @@ import hashlib
 import os
 import requests
 import json
+import time
 
 # Config file location
 CONFIG_FILE = 'config.json'
@@ -56,14 +57,18 @@ def calculate_md5(file_path):
     return hasher.hexdigest()
 
 # Check file with VirusTotal and cache the result with enhanced error handling
-def check_virustotal(file_hash, cache):
+def check_virustotal(file_hash, file_path, cache):
     if file_hash in cache:
         return cache[file_hash]
 
     params = {'apikey': API_KEY, 'resource': file_hash}
     try:
+        # First, check if the file is already in the VirusTotal database
         response = requests.get(BASE_URL + 'file/report', params=params)
         response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
+        print(f"VirusTotal response status code: {response.status_code}")
+        print(f"VirusTotal response content: {response.content.decode()}")  # Log the raw content
+
         result = response.json()
 
         if result['response_code'] == 1:  # File found in VirusTotal database
@@ -72,12 +77,32 @@ def check_virustotal(file_hash, cache):
             else:
                 detection = "No threats detected by VirusTotal."
             cache[file_hash] = detection
-        else:
-            detection = "File not found in VirusTotal database."
-            cache[file_hash] = detection
+            save_cache(cache)
+            return detection
 
-        save_cache(cache)
-        return detection
+        elif result['response_code'] == 0:  # File not found, submit the file for scanning
+            print(f"File not found in VirusTotal database, submitting for analysis: {file_path}")
+            files = {'file': (file_path, open(file_path, 'rb'))}
+            response = requests.post(BASE_URL + 'file/scan', files=files, params={'apikey': API_KEY})
+            response.raise_for_status()
+            result = response.json()
+            print(f"File submitted for analysis: {result}")
+            detection = "File submitted for analysis, please try again later."
+            cache[file_hash] = detection
+            save_cache(cache)
+            return detection
+
+        elif response.status_code == 204:  # Rate limiting exceeded
+            print("Rate limit exceeded, sleeping for 60 seconds")
+            time.sleep(60)
+            return check_virustotal(file_hash, file_path, cache)
+
+        else:
+            detection = "Unexpected response from VirusTotal."
+            cache[file_hash] = detection
+            save_cache(cache)
+            return detection
+
     except requests.exceptions.RequestException as e:
         print(f"Error contacting VirusTotal: {e}")
         return "Error contacting VirusTotal"
@@ -92,7 +117,7 @@ def scan_file(file_path, cache):
         return local_virus_db[file_hash]
 
     # Check with VirusTotal and cache the result
-    return check_virustotal(file_hash, cache)
+    return check_virustotal(file_hash, file_path, cache)
 
 # Scan a directory
 def scan_directory(directory, cache):
