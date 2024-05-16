@@ -63,7 +63,7 @@ def calculate_md5(file_path):
 def check_hybrid_analysis(file_hash):
     headers = {
         'api-key': HYBRID_ANALYSIS_API_KEY,
-        'User-Agent': 'Falcon Sandbox',
+        'User-Agent': 'Falcon',
         'accept': 'application/json'
     }
     url = f'{HYBRID_ANALYSIS_BASE_URL}search/hash'
