@@ -160,7 +160,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Scan files and directories for viruses.")
-    parser.add_argument('path', help="Path to the file or directory to scan")
+    parser.addument('path', help="Path to the file or directory to scan")
     args = parser.parse_args()
 
     cache = load_cache()
