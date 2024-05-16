@@ -40,7 +40,7 @@ local_virus_db = {
 def load_cache():
     if os.path.exists(CACHE_FILE):
         try:
-            with open(CACHE_FILE, 'r') as f):
+            with open(CACHE_FILE, 'r') as f:
                 return json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
             return {}
@@ -48,7 +48,7 @@ def load_cache():
 
 # Save cache to file
 def save_cache(cache):
-    with open(CACHE_FILE, 'w') as f):
+    with open(CACHE_FILE, 'w') as f:
         json.dump(cache, f)
 
 # Calculate MD5 hash of a file
