@@ -1,6 +1,3 @@
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
 import hashlib
 import os
 import requests
