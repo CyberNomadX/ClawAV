@@ -4,10 +4,12 @@ import requests
 import json
 import time
 
-# Config file location
+# Configuration and API keys
 CONFIG_FILE = 'config.json'
+HYBRID_ANALYSIS_API_KEY = 'your_hybrid_analysis_api_key'
+HYBRID_ANALYSIS_BASE_URL = 'https://www.hybrid-analysis.com/api/v2/'
 
-# Load API key from config file
+# Load VirusTotal API key from config file
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         raise FileNotFoundError(f"{CONFIG_FILE} not found. Please create it with your VirusTotal API key.")
@@ -22,18 +24,18 @@ def load_config():
     return api_key
 
 API_KEY = load_config()
-BASE_URL = 'https://www.virustotal.com/vtapi/v2/'
+VIRUSTOTAL_BASE_URL = 'https://www.virustotal.com/vtapi/v2/'
 CACHE_FILE = 'cache.json'
 REQUESTS_PER_MINUTE = 4  # VirusTotal free API allows 4 requests per minute
 REQUESTS_PER_DAY = 500  # VirusTotal free API allows 500 requests per day
 
-# Sample database of known malicious file hashes (local database)
+# Local database of known malicious file hashes
 local_virus_db = {
     "e99a18c428cb38d5f260853678922e03": "Example Virus",
     # Add more known virus hashes here
 }
 
-# Load cache from file with improved error handling
+# Load cache from file with error handling
 def load_cache():
     if os.path.exists(CACHE_FILE):
         try:
@@ -56,20 +58,23 @@ def calculate_md5(file_path):
         hasher.update(buf)
     return hasher.hexdigest()
 
-# Check file with VirusTotal and cache the result with enhanced error handling
-def check_virustotal(file_hash, file_path, cache, requests_count):
+# Check file with Hybrid Analysis and return the result
+def check_hybrid_analysis(file_hash):
+    headers = {'api-key': HYBRID_ANALYSIS_API_KEY, 'User-Agent': 'Falcon Sandbox'}
+    response = requests.get(f'{HYBRID_ANALYSIS_BASE_URL}search/hash', headers=headers, params={'hash': file_hash})
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
+
+# Check file with VirusTotal and cache the result with error handling
+def check_virustotal(file_hash, file_path, cache):
     if file_hash in cache:
         return cache[file_hash]
 
     params = {'apikey': API_KEY, 'resource': file_hash}
     try:
-        if requests_count >= REQUESTS_PER_MINUTE:
-            print("Rate limit exceeded, sleeping for 60 seconds")
-            time.sleep(60)
-            requests_count = 0
-
-        response = requests.get(BASE_URL + 'file/report', params=params)
-        requests_count += 1
+        response = requests.get(VIRUSTOTAL_BASE_URL + 'file/report', params=params)
         response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
         print(f"VirusTotal response status code: {response.status_code}")
         print(f"VirusTotal response content: {response.content.decode()}")  # Log the raw content
@@ -88,8 +93,7 @@ def check_virustotal(file_hash, file_path, cache, requests_count):
         elif result['response_code'] == 0:  # File not found, submit the file for scanning
             print(f"File not found in VirusTotal database, submitting for analysis: {file_path}")
             files = {'file': (file_path, open(file_path, 'rb'))}
-            response = requests.post(BASE_URL + 'file/scan', files=files, params={'apikey': API_KEY})
-            requests_count += 1
+            response = requests.post(VIRUSTOTAL_BASE_URL + 'file/scan', files=files, params={'apikey': API_KEY})
             response.raise_for_status()
             result = response.json()
             print(f"File submitted for analysis: {result}")
@@ -101,7 +105,7 @@ def check_virustotal(file_hash, file_path, cache, requests_count):
         elif response.status_code == 204:  # Rate limiting exceeded
             print("Rate limit exceeded, sleeping for 60 seconds")
             time.sleep(60)
-            return check_virustotal(file_hash, file_path, cache, requests_count)
+            return check_virustotal(file_hash, file_path, cache)
 
         else:
             detection = "Unexpected response from VirusTotal."
@@ -117,21 +121,28 @@ def check_virustotal(file_hash, file_path, cache, requests_count):
         return "Error decoding JSON response from VirusTotal"
 
 # Scan a single file
-def scan_file(file_path, cache, requests_count):
+def scan_file(file_path, cache):
     file_hash = calculate_md5(file_path)
     if file_hash in local_virus_db:
         return local_virus_db[file_hash]
 
-    # Check with VirusTotal and cache the result
-    return check_virustotal(file_hash, file_path, cache, requests_count)
+    hybrid_analysis_result = check_hybrid_analysis(file_hash)
+    if hybrid_analysis_result:
+        if hybrid_analysis_result.get('threat_score', 0) > 0:
+            print(f"Hybrid Analysis found threat for {file_hash}, submitting to VirusTotal")
+            return check_virustotal(file_hash, file_path, cache)
+        else:
+            return f"No threats detected by Hybrid Analysis with threat score {hybrid_analysis_result.get('threat_score', 0)}."
+
+    return "No threats detected by Hybrid Analysis."
 
 # Scan a directory
-def scan_directory(directory, cache, requests_count):
+def scan_directory(directory, cache):
     results = {}
     for root, _, files in os.walk(directory):
         for file in files:
             file_path = os.path.join(root, file)
-            result = scan_file(file_path, cache, requests_count)
+            result = scan_file(file_path, cache)
             if result:
                 results[file_path] = result
     return results
@@ -144,16 +155,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     cache = load_cache()
-    requests_count = 0
 
     if os.path.isfile(args.path):
-        result = scan_file(args.path, cache, requests_count)
+        result = scan_file(args.path, cache)
         if result:
             print(f"Threat detected: {result}")
         else:
             print("No threats detected.")
     elif os.path.isdir(args.path):
-        results = scan_directory(args.path, cache, requests_count)
+        results = scan_directory(args.path, cache)
         if results:
             for file_path, virus in results.items():
                 print(f"Threat detected in {file_path}: {virus}")
