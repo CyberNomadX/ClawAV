@@ -62,11 +62,14 @@ def calculate_md5(file_path):
 # Check file with Hybrid Analysis and return the result
 def check_hybrid_analysis(file_hash):
     headers = {'api-key': HYBRID_ANALYSIS_API_KEY, 'User-Agent': 'Falcon Sandbox'}
-    response = requests.get(f'{HYBRID_ANALYSIS_BASE_URL}search/hash', headers=headers, params={'hash': file_hash})
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return None
+    try:
+        response = requests.get(f'{HYBRID_ANALYSIS_BASE_URL}search/hash', headers=headers, params={'hash': file_hash})
+        response.raise_for_status()
+        if response.status_code == 200:
+            return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error contacting Hybrid Analysis: {e}")
+    return None
 
 # Check file with VirusTotal and cache the result with error handling
 def check_virustotal(file_hash, file_path, cache):
@@ -137,11 +140,11 @@ def scan_file(file_path, cache):
             return check_virustotal(file_hash, file_path, cache)
         else:
             print(f"No threats detected by Hybrid Analysis with verdict {hybrid_analysis_result.get('verdict', 'unknown')}.")
-            if file_hash == "44d88612fea8a8f36de82e1278abb02f":  # Check VirusTotal for EICAR
-                print(f"File {file_path} is the EICAR test file. Submitting to VirusTotal for verification.")
-                return check_virustotal(file_hash, file_path, cache)
     else:
-        print("No response from Hybrid Analysis.")
+        print("No response from Hybrid Analysis or error occurred. Checking VirusTotal as fallback.")
+        if file_hash == "44d88612fea8a8f36de82e1278abb02f":  # Check VirusTotal for EICAR
+            print(f"File {file_path} is the EICAR test file. Submitting to VirusTotal for verification.")
+            return check_virustotal(file_hash, file_path, cache)
 
     return "No threats detected by Hybrid Analysis."
 
