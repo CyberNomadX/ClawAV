@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import hashlib
 import os
 import requests
@@ -64,6 +62,9 @@ def check_virustotal(file_hash, cache):
     try:
         response = requests.get(BASE_URL + 'file/report', params=params)
         response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
+        print(f"VirusTotal response status code: {response.status_code}")
+        print(f"VirusTotal response content: {response.content.decode()}")  # Log the raw content
+
         result = response.json()
 
         if result['response_code'] == 1:  # File found in VirusTotal database

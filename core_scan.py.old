@@ -55,27 +55,35 @@ def calculate_md5(file_path):
         hasher.update(buf)
     return hasher.hexdigest()
 
-# Check file with VirusTotal and cache the result
+# Check file with VirusTotal and cache the result with enhanced error handling
 def check_virustotal(file_hash, cache):
     if file_hash in cache:
         return cache[file_hash]
 
     params = {'apikey': API_KEY, 'resource': file_hash}
-    response = requests.get(BASE_URL + 'file/report', params=params)
-    result = response.json()
+    try:
+        response = requests.get(BASE_URL + 'file/report', params=params)
+        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
+        result = response.json()
 
-    if result['response_code'] == 1:  # File found in VirusTotal database
-        if result['positives'] > 0:
-            detection = f"VirusTotal detection: {result['positives']}/{result['total']} detections"
+        if result['response_code'] == 1:  # File found in VirusTotal database
+            if result['positives'] > 0:
+                detection = f"VirusTotal detection: {result['positives']}/{result['total']} detections"
+            else:
+                detection = "No threats detected by VirusTotal."
+            cache[file_hash] = detection
         else:
-            detection = "No threats detected by VirusTotal."
-        cache[file_hash] = detection
-    else:
-        detection = "File not found in VirusTotal database."
-        cache[file_hash] = detection
+            detection = "File not found in VirusTotal database."
+            cache[file_hash] = detection
 
-    save_cache(cache)
-    return detection
+        save_cache(cache)
+        return detection
+    except requests.exceptions.RequestException as e:
+        print(f"Error contacting VirusTotal: {e}")
+        return "Error contacting VirusTotal"
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON response from VirusTotal: {e}")
+        return "Error decoding JSON response from VirusTotal"
 
 # Scan a single file
 def scan_file(file_path, cache):
