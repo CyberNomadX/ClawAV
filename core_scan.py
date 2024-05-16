@@ -29,8 +29,9 @@ CACHE_FILE = 'cache.json'
 REQUESTS_PER_MINUTE = 4  # VirusTotal free API allows 4 requests per minute
 REQUESTS_PER_DAY = 500  # VirusTotal free API allows 500 requests per day
 
-# Local database of known malicious file hashes
+# Local database of known malicious file hashes including EICAR test hash
 local_virus_db = {
+    "44d88612fea8a8f36de82e1278abb02f": "EICAR Test File",
     "e99a18c428cb38d5f260853678922e03": "Example Virus",
     # Add more known virus hashes here
 }
@@ -125,16 +126,22 @@ def check_virustotal(file_hash, file_path, cache):
 def scan_file(file_path, cache):
     file_hash = calculate_md5(file_path)
     if file_hash in local_virus_db:
+        print(f"File {file_path} matches local virus database. {local_virus_db[file_hash]}")
         return local_virus_db[file_hash]
 
     print(f"Scanning file: {file_path}")
     hybrid_analysis_result = check_hybrid_analysis(file_hash)
     if hybrid_analysis_result:
-        if hybrid_analysis_result.get('threat_score', 0) > 0:
+        if hybrid_analysis_result.get('verdict', '').lower() == 'malicious':
             print(f"Hybrid Analysis found threat for {file_hash}, submitting to VirusTotal")
             return check_virustotal(file_hash, file_path, cache)
         else:
-            return f"No threats detected by Hybrid Analysis with threat score {hybrid_analysis_result.get('threat_score', 0)}."
+            return f"No threats detected by Hybrid Analysis with verdict {hybrid_analysis_result.get('verdict', 'unknown')}."
+
+    # Always check VirusTotal for EICAR test file
+    if file_hash == "44d88612fea8a8f36de82e1278abb02f":
+        print(f"File {file_path} is the EICAR test file. Submitting to VirusTotal for verification.")
+        return check_virustotal(file_hash, file_path, cache)
 
     return "No threats detected by Hybrid Analysis."
 

@@ -74,6 +74,7 @@ def check_virustotal(file_hash, file_path, cache):
 
     params = {'apikey': API_KEY, 'resource': file_hash}
     try:
+        print(f"Checking VirusTotal for {file_hash}...")
         response = requests.get(VIRUSTOTAL_BASE_URL + 'file/report', params=params)
         response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
         print(f"VirusTotal response status code: {response.status_code}")
@@ -126,6 +127,7 @@ def scan_file(file_path, cache):
     if file_hash in local_virus_db:
         return local_virus_db[file_hash]
 
+    print(f"Scanning file: {file_path}")
     hybrid_analysis_result = check_hybrid_analysis(file_hash)
     if hybrid_analysis_result:
         if hybrid_analysis_result.get('threat_score', 0) > 0:
