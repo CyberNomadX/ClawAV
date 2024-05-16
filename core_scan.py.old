@@ -1,20 +1,30 @@
+#!/usr/bin/env python
+
 import hashlib
 import os
 import requests
 import json
 
-# Load API key from config file
+# Config file location
 CONFIG_FILE = 'config.json'
 
-with open(CONFIG_FILE, 'r') as f:
-    config = json.load(f)
+# Load API key from config file
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        raise FileNotFoundError(f"{CONFIG_FILE} not found. Please create it with your VirusTotal API key.")
 
-API_KEY = config.get('virustotal_api_key')
+    with open(CONFIG_FILE, 'r') as f:
+        config = json.load(f)
+
+    api_key = config.get('virustotal_api_key')
+    if not api_key:
+        raise ValueError("No API key found in config.json.")
+    
+    return api_key
+
+API_KEY = load_config()
 BASE_URL = 'https://www.virustotal.com/vtapi/v2/'
 CACHE_FILE = 'cache.json'
-
-if not API_KEY:
-    raise ValueError("No API key found in config.json.")
 
 # Sample database of known malicious file hashes (local database)
 local_virus_db = {
@@ -22,11 +32,14 @@ local_virus_db = {
     # Add more known virus hashes here
 }
 
-# Load cache from file
+# Load cache from file with improved error handling
 def load_cache():
     if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE, 'r') as f:
-            return json.load(f)
+        try:
+            with open(CACHE_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return {}
     return {}
 
 # Save cache to file
