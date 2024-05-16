@@ -6,25 +6,25 @@ import time
 
 # Configuration and API keys
 CONFIG_FILE = 'config.json'
-HYBRID_ANALYSIS_API_KEY = 'your_hybrid_analysis_api_key'
-HYBRID_ANALYSIS_BASE_URL = 'https://www.hybrid-analysis.com/api/v2/'
 
-# Load VirusTotal API key from config file
+# Load API keys from config file
 def load_config():
     if not os.path.exists(CONFIG_FILE):
-        raise FileNotFoundError(f"{CONFIG_FILE} not found. Please create it with your VirusTotal API key.")
+        raise FileNotFoundError(f"{CONFIG_FILE} not found. Please create it with your API keys.")
 
     with open(CONFIG_FILE, 'r') as f:
         config = json.load(f)
 
-    api_key = config.get('virustotal_api_key')
-    if not api_key:
-        raise ValueError("No API key found in config.json.")
+    virustotal_api_key = config.get('virustotal_api_key')
+    hybrid_analysis_api_key = config.get('hybrid_analysis_api_key')
+    if not virustotal_api_key or not hybrid_analysis_api_key:
+        raise ValueError("API keys for VirusTotal and/or Hybrid Analysis not found in config.json.")
     
-    return api_key
+    return virustotal_api_key, hybrid_analysis_api_key
 
-API_KEY = load_config()
+VIRUSTOTAL_API_KEY, HYBRID_ANALYSIS_API_KEY = load_config()
 VIRUSTOTAL_BASE_URL = 'https://www.virustotal.com/vtapi/v2/'
+HYBRID_ANALYSIS_BASE_URL = 'https://www.hybrid-analysis.com/api/v2/'
 CACHE_FILE = 'cache.json'
 REQUESTS_PER_MINUTE = 4  # VirusTotal free API allows 4 requests per minute
 REQUESTS_PER_DAY = 500  # VirusTotal free API allows 500 requests per day
@@ -73,7 +73,7 @@ def check_virustotal(file_hash, file_path, cache):
     if file_hash in cache:
         return cache[file_hash]
 
-    params = {'apikey': API_KEY, 'resource': file_hash}
+    params = {'apikey': VIRUSTOTAL_API_KEY, 'resource': file_hash}
     try:
         print(f"Checking VirusTotal for {file_hash}...")
         response = requests.get(VIRUSTOTAL_BASE_URL + 'file/report', params=params)
@@ -95,7 +95,7 @@ def check_virustotal(file_hash, file_path, cache):
         elif result['response_code'] == 0:  # File not found, submit the file for scanning
             print(f"File not found in VirusTotal database, submitting for analysis: {file_path}")
             files = {'file': (file_path, open(file_path, 'rb'))}
-            response = requests.post(VIRUSTOTAL_BASE_URL + 'file/scan', files=files, params={'apikey': API_KEY})
+            response = requests.post(VIRUSTOTAL_BASE_URL + 'file/scan', files=files, params={'apikey': VIRUSTOTAL_API_KEY})
             response.raise_for_status()
             result = response.json()
             print(f"File submitted for analysis: {result}")

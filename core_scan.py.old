@@ -136,12 +136,12 @@ def scan_file(file_path, cache):
             print(f"Hybrid Analysis found threat for {file_hash}, submitting to VirusTotal")
             return check_virustotal(file_hash, file_path, cache)
         else:
-            return f"No threats detected by Hybrid Analysis with verdict {hybrid_analysis_result.get('verdict', 'unknown')}."
-
-    # Always check VirusTotal for EICAR test file
-    if file_hash == "44d88612fea8a8f36de82e1278abb02f":
-        print(f"File {file_path} is the EICAR test file. Submitting to VirusTotal for verification.")
-        return check_virustotal(file_hash, file_path, cache)
+            print(f"No threats detected by Hybrid Analysis with verdict {hybrid_analysis_result.get('verdict', 'unknown')}.")
+            if file_hash == "44d88612fea8a8f36de82e1278abb02f":  # Check VirusTotal for EICAR
+                print(f"File {file_path} is the EICAR test file. Submitting to VirusTotal for verification.")
+                return check_virustotal(file_hash, file_path, cache)
+    else:
+        print("No response from Hybrid Analysis.")
 
     return "No threats detected by Hybrid Analysis."
 
